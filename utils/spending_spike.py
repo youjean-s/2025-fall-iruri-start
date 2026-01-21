@@ -55,8 +55,10 @@ def detect_spending_spike(transactions, detector: "SpendingSpikeDetector" = None
     for tx in transactions:
         amt = tx.get("amount", 0)
         try:
-            amt_int = int(amt)
+            amt_int = int(float(amt))
         except Exception:
+            continue
+        if amt_int <= 0:
             continue
 
         s = detector.compute_spike(amt_int)
