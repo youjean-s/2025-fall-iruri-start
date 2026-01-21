@@ -39,6 +39,10 @@ def calculate_fhi_from_transactions(transactions) -> dict:
     imp_score = float(impulsive.get("impulsive_score", 0.0))
     spike_score = float(spike.get("spike_score", 0.0))
 
+
+    imp_score = max(0.0, min(1.0, imp_score))
+    spike_score = max(0.0, spike_score)  # spike는 ratio라 0 이상만
+
     fhi = calculate_fhi(imp_score, spike_score)
 
     return {"fhi": fhi, "impulsive": impulsive, "spike": spike}
