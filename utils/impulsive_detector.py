@@ -1,3 +1,10 @@
+"""
+impulsive_detector.py
+Input: transactions (list[dict]) from parser normalized schema
+Output: {"impulsive_score": float, "impulsive_flags": list}
+"""
+
+
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -67,9 +74,12 @@ def detect_impulsive(transactions, detector: Optional["ImpulsiveDetector"] = Non
         if not isinstance(dt, datetime):
             continue
         try:
-            amt_int = int(amt)
+            amt_int = int(float(amt))
         except Exception:
             continue
+        if amt_int <= 0:
+            continue
+    
 
         s = detector.compute_score(dt, amt_int)
         scores.append(s)

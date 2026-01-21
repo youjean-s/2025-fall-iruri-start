@@ -1,7 +1,17 @@
+import re
+
+def _norm(s: str) -> str:
+    s = (s or "").strip().lower()
+    # 지점/점/센터 같은 꼬리 제거(너무 공격적이면 1주차 후반에 조정)
+    s = re.sub(r"\s+", "", s)
+    s = re.sub(r"(지점|점|센터|본점)$", "", s)
+    return s
+
 def categorize_store(store_name: str) -> str:
     """
     Map store names to spending categories using keyword rules.
     """
+    store_n = _norm(store_name)
 
     rules = {
         "편의점": ["GS25", "CU", "세븐일레븐", "이마트24"],
@@ -14,7 +24,7 @@ def categorize_store(store_name: str) -> str:
     }
 
     for category, keywords in rules.items():
-        if any(k in store_name for k in keywords):
+        if any(_norm(k) in store_n for k in keywords):
             return category
 
     return "기타"
