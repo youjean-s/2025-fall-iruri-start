@@ -1,0 +1,5 @@
+# ML generated data
+ml/data/raw/
+ml/data/processed/
+ml/data/features/
+ml/artifacts/
