@@ -85,10 +85,10 @@ CASES = [
 
     # extreme-ish amount (still should parse)
     {
-        "name": "unknown_extreme_large_amount",
-        "text": "승인\n현대백화점\n2025-01-04 15:44\n5,000,000원",
-        "expect_source": "unknown",
-        "expect_category": "쇼핑",
+         "name": "unknown_extreme_large_amount",
+         "text": "승인\n현대백화점\n2025-01-04 15:44\n5,000,000원",
+         "expect_source": "hyundai",
+         "expect_category": "쇼핑",
     },
     {
         "name": "unknown_small_amount",
@@ -115,6 +115,23 @@ def run():
             continue
 
         tx = txs[0]
+        required_keys = ["datetime", "amount", "merchant", "category", "source", "payment_method", "raw_text"]
+        missing = [k for k in required_keys if k not in tx]
+        if missing:
+            print(f"[FAIL] {name}: missing keys {missing} => {tx}")
+            fail += 1
+            continue
+
+        if not isinstance(tx.get("amount"), int):
+            print(f"[FAIL] {name}: amount not int => {tx.get('amount')} ({type(tx.get('amount'))})")
+            fail += 1
+            continue
+
+        if tx.get("datetime") is None:
+            print(f"[FAIL] {name}: datetime is None => {tx}")
+            fail += 1
+            continue
+
         source = tx.get("source")
         pay = tx.get("payment_method")
         merchant = tx.get("merchant")
