@@ -3,12 +3,13 @@ from pydantic import BaseModel
 from typing import List
 import random
 
-from mock.push_emulator import get_random_push
-from utils.parser import parse_push_notification
-from utils.category_rules import categorize_store
+#from mock.push_emulator import get_random_push
+#from utils.parser import parse_push_notification
+#from utils.category_rules import categorize_store
 from utils.fhi_calculator import calculate_fhi_from_transactions
 from ml.ml_runtime.feature_builder import build_features_from_transactions
 from ml.src.coaching_card import generate_coaching_card
+from demo_pages.demo_persona_data import get_beauty_persona_transactions #demo only
 
 app = FastAPI()
 
@@ -54,14 +55,16 @@ class RefreshRequest(BaseModel):
     current_titles: List[str] = []
 
 def build_demo_transactions():
-    push = get_random_push()
+     return get_beauty_persona_transactions()
+'''push = get_random_push()
     txs = parse_push_notification(push)
 
     # 혹시 단건/문자 파싱 결과가 1개뿐이어도 동작은 하게 둠
     for tx in txs:
         tx["category"] = categorize_store(tx.get("merchant", ""))
 
-    return txs
+    return txs'''
+    #demo only 
 
 def safe_generate_card(fhi, features, impulsive_score, spike_score, current_titles=None):
     current_titles = current_titles or []
