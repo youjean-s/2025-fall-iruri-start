@@ -117,12 +117,14 @@ def _safe_generate_card(
 
 def _analyze_transactions(txs: List[Dict[str, Any]]) -> Dict[str, Any]:
     """거래 목록 → FHI 분석 결과 반환 (공통 로직)"""
-    result = calculate_fhi_from_transactions(txs, mode="ml")
+    rule_result = calculate_fhi_from_transactions(txs, mode="rule")
+    ml_result = calculate_fhi_from_transactions(txs, mode="ml")
     features = build_features_from_transactions(txs)
 
-    fhi = result["fhi"]
-    impulsive_score = result["impulsive"].get("impulsive_score", 0.0)
-    spike_score = result["spike"].get("spike_score", 0.0)
+    fhi = rule_result["fhi"]
+    fhi_predicted = ml_result["fhi"]
+    impulsive_score = rule_result["impulsive"].get("impulsive_score", 0.0)
+    spike_score = rule_result["spike"].get("spike_score", 0.0)
 
     cards = []
     current_titles = []
@@ -139,6 +141,7 @@ def _analyze_transactions(txs: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     return {
         "fhi": fhi,
+        "fhi_predicted": fhi_predicted,   # ← 추가
         "grade": _fhi_grade(fhi),
         "impulsive_score": impulsive_score,
         "spike_score": spike_score,
