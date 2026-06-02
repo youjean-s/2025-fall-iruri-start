@@ -119,7 +119,8 @@ def _analyze_transactions(txs: List[Dict[str, Any]]) -> Dict[str, Any]:
     """거래 목록 → FHI 분석 결과 반환 (공통 로직)"""
     rule_result = calculate_fhi_from_transactions(txs, mode="rule")
     ml_result = calculate_fhi_from_transactions(txs, mode="ml")
-    features = build_features_from_transactions(txs)
+    from datetime import datetime
+    features = build_features_from_transactions(txs, asof=datetime.now())
 
     fhi = rule_result["fhi"]
     fhi_predicted = ml_result["fhi"]
@@ -180,8 +181,7 @@ def fhi_analyze(req: TransactionRequest) -> Dict[str, Any]:
     """
     txs = req.transactions
     for tx in txs:
-        if not tx.get("category"):
-            tx["category"] = categorize_store(tx.get("merchant", ""))
+        tx["category"] = categorize_store(tx.get("merchant", ""))
     return _analyze_transactions(txs)
 
 
