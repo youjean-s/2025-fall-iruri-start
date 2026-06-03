@@ -89,7 +89,7 @@ CATEGORY_KEYWORDS = {
     ],
 }
 
-def classify(merchant: str) -> str:
+def categorize_store(merchant: str) -> str:
     norm = _norm(merchant)
     for category, keywords in CATEGORY_KEYWORDS.items():
         for kw in keywords:

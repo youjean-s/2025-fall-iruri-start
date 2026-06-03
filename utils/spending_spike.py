@@ -1,46 +1,6 @@
-"""
-spending_spike.py
-Input: transactions (list[dict]) from parser normalized schema
-Output: {"spike_score": float, "spike_flags": list}
-"""
+from datetime import datetime, timedelta
 
-class SpendingSpikeDetector:
-    """
-    최근 7일 평균 vs 이전 30일 평균 비교
-    """
-
-    def __init__(self):
-        self.daily_history = []  # 금액 목록
-
-    def compute_spike(self, amount: int) -> float:
-        self.daily_history.append(amount)
-
-        if len(self.daily_history) < 10:
-            return 0.0  # 데이터 부족 → 급증 판단 못함
-
-        recent7 = self.daily_history[-7:]
-        prev30 = self.daily_history[-37:-7] if len(self.daily_history) >= 37 else self.daily_history[:-7]
-
-        if not prev30:
-            return 0.0
-
-        avg_recent = sum(recent7) / len(recent7)
-        avg_prev = sum(prev30) / len(prev30)
-
-        if avg_prev == 0:
-            return 0.0
-
-        spike_ratio = (avg_recent - avg_prev) / avg_prev
-        return round(spike_ratio, 2)
-
-def detect_spending_spike(transactions, detector: "SpendingSpikeDetector" = None) -> dict:
-    """
-    transactions: list[dict] (parser normalized schema)
-      expected keys: datetime, amount, merchant, ...
-    returns:
-      {"spike_score": float, "spike_flags": list}
-    """
-    # ✅ Input guard
+def detect_spending_spike(transactions, detector=None) -> dict:
     if not transactions:
         return {"spike_score": 0.0, "spike_flags": []}
     if isinstance(transactions, dict):
@@ -49,27 +9,40 @@ def detect_spending_spike(transactions, detector: "SpendingSpikeDetector" = None
     if not transactions:
         return {"spike_score": 0.0, "spike_flags": []}
 
-    detector = detector or SpendingSpikeDetector()
-
-    scores = []
+    # 날짜 파싱
+    parsed = []
     for tx in transactions:
-        amt = tx.get("amount", 0)
         try:
-            amt_int = int(float(amt))
+            dt = datetime.fromisoformat(str(tx.get("datetime", "")))
+            amt = int(float(tx.get("amount", 0)))
+            if amt > 0:
+                parsed.append((dt, amt))
         except Exception:
             continue
-        if amt_int <= 0:
-            continue
 
-        s = detector.compute_spike(amt_int)
-        scores.append(s)
+    if not parsed:
+        return {"spike_score": 0.0, "spike_flags": []}
 
-    # 0주차 정책: 여러 건이면 최근 값(마지막)을 spike_score로 사용
-    spike_score = scores[-1] if scores else 0.0
+    asof = datetime.now()
+    w7 = asof - timedelta(days=7)
+    w30 = asof - timedelta(days=30)
 
-    # flag는 일단 “급증”으로 볼 만한 임계치만 표시(임계치는 1주차에 튜닝)
+    recent7 = [amt for dt, amt in parsed if dt >= w7]
+    prev30 = [amt for dt, amt in parsed if w30 <= dt < w7]
+
+    if not recent7 or not prev30:
+        return {"spike_score": 0.0, "spike_flags": []}
+
+    avg_recent = sum(recent7) / len(recent7)
+    avg_prev = sum(prev30) / len(prev30)
+
+    if avg_prev == 0:
+        return {"spike_score": 0.0, "spike_flags": []}
+
+    spike_ratio = round((avg_recent - avg_prev) / avg_prev, 2)
+
     spike_flags = []
-    if spike_score >= 0.5:  # 예: 50% 이상 증가
-        spike_flags.append({"reason": "spike_ratio>=0.5", "score": spike_score})
+    if spike_ratio >= 0.5:
+        spike_flags.append({"reason": "spike_ratio>=0.5", "score": spike_ratio})
 
-    return {"spike_score": spike_score, "spike_flags": spike_flags}
+    return {"spike_score": spike_ratio, "spike_flags": spike_flags}

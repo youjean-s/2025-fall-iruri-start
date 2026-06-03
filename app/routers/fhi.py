@@ -2,7 +2,6 @@
 app/routers/fhi.py
 ------------------
 FHI(금융건강지수) 분석 및 코칭카드 라우터
-iruri 프로젝트의 demo_api.py를 finnut-backend 라우터 구조로 이식
 """
 
 import random
@@ -18,7 +17,11 @@ from ml.ml_runtime.feature_builder import build_features_from_transactions
 
 router = APIRouter(tags=["fhi"])
 
-# OpenAI 미설정 시 사용할 fallback 코칭카드
+VALID_CATEGORIES = {
+    "convenience", "cafe", "food", "transport", "shopping",
+    "housing", "entertainment", "subscription", "other"
+}
+
 FALLBACK_CARDS = [
     {
         "title": "텀블러 챙기기",
@@ -62,7 +65,6 @@ class RefreshRequest(BaseModel):
 
 
 class TransactionRequest(BaseModel):
-    """실제 거래 데이터를 직접 전달할 때 사용"""
     transactions: List[Dict[str, Any]]
 
 
@@ -75,7 +77,6 @@ def _fhi_grade(fhi: float) -> str:
 
 
 def _build_demo_transactions() -> List[Dict[str, Any]]:
-    """mock 푸시 알림으로 거래 목록 생성 (데모용)"""
     push = get_random_push()
     txs = parse_push_notification(push)
     for tx in txs:
@@ -90,7 +91,6 @@ def _safe_generate_card(
     spike_score: float,
     current_titles: List[str] = None,
 ) -> Dict[str, Any]:
-    """코칭카드 생성 — OpenAI 실패 시 fallback 반환"""
     current_titles = current_titles or []
     try:
         from ml.src.coaching_card import generate_coaching_card
@@ -116,10 +116,10 @@ def _safe_generate_card(
 
 
 def _analyze_transactions(txs: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """거래 목록 → FHI 분석 결과 반환 (공통 로직)"""
     rule_result = calculate_fhi_from_transactions(txs, mode="rule")
     ml_result = calculate_fhi_from_transactions(txs, mode="ml")
-    features = build_features_from_transactions(txs)
+    from datetime import datetime
+    features = build_features_from_transactions(txs, asof=datetime.now())
 
     fhi = rule_result["fhi"]
     fhi_predicted = ml_result["fhi"]
@@ -141,7 +141,7 @@ def _analyze_transactions(txs: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     return {
         "fhi": fhi,
-        "fhi_predicted": fhi_predicted,   # ← 추가
+        "fhi_predicted": fhi_predicted,
         "grade": _fhi_grade(fhi),
         "impulsive_score": impulsive_score,
         "spike_score": spike_score,
@@ -150,54 +150,31 @@ def _analyze_transactions(txs: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
-# ──────────────────────────────
-# 엔드포인트
-# ──────────────────────────────
-
 @router.post("/fhi/demo")
 def fhi_demo() -> Dict[str, Any]:
-    """
-    mock 푸시 알림 기반 FHI 분석 데모
-    실제 데이터 없이 테스트할 때 사용
-    """
     txs = _build_demo_transactions()
     return _analyze_transactions(txs)
 
 
 @router.post("/fhi/analyze")
 def fhi_analyze(req: TransactionRequest) -> Dict[str, Any]:
-    """
-    실제 거래 데이터 기반 FHI 분석
-    transactions 배열을 직접 전달
-    
-    각 거래 항목 형식:
-      {
-        "datetime": "2024-11-21T23:10:00",
-        "amount": 5800,
-        "merchant": "GS25 이대점",
-        "category": "편의점"   (선택)
-      }
-    """
     txs = req.transactions
     for tx in txs:
-        if not tx.get("category"):
+        existing = tx.get("category", "")
+        # 이미 유효한 영어 카테고리면 유지, 아니면 merchant명으로 재분류
+        if existing not in VALID_CATEGORIES:
             tx["category"] = categorize_store(tx.get("merchant", ""))
     return _analyze_transactions(txs)
 
 
 @router.post("/fhi/parse")
 def fhi_parse_push(body: Dict[str, str]) -> Dict[str, Any]:
-    """
-    카드사 푸시 알림 텍스트 파싱
-    body: {"text": "푸시알림 원문"}
-    """
     text = body.get("text", "")
     if not text:
         return {"transactions": [], "error": "text 필드가 비어있습니다"}
     txs = parse_push_notification(text)
     for tx in txs:
         tx["category"] = categorize_store(tx.get("merchant", ""))
-        # datetime → str 직렬화
         if hasattr(tx.get("datetime"), "isoformat"):
             tx["datetime"] = tx["datetime"].isoformat()
     return {"transactions": txs}
@@ -205,9 +182,6 @@ def fhi_parse_push(body: Dict[str, str]) -> Dict[str, Any]:
 
 @router.post("/fhi/refresh-card")
 def fhi_refresh_card(req: RefreshRequest) -> Dict[str, Any]:
-    """
-    카드 새로고침 — 현재 카드 제목 목록을 보내면 다른 카드 반환
-    """
     return _safe_generate_card(
         fhi=req.fhi,
         features=req.features,
