@@ -8,6 +8,10 @@ from app.routers.users import router as users_router
 from app.routers.eligibility import router as eligibility_router
 from app.routers.user_recommendations import router as user_recommendations_router
 from app.routers.fhi import router as fhi_router
+from app.routers.friends import router as friends_router
+from app.routers.challenges import router as challenges_router
+# ⚠️ friends_router는 /users/search를 정의하므로, /users/{user_id}보다
+#    먼저 include 해야 라우트 충돌(422) 안 남
 
 app = FastAPI(
     title="FINNUT Backend",
@@ -30,6 +34,12 @@ init_db()
 def health_check():
     return {"status": "ok"}
 
+
+# 친구 (검색/요청/수락) — /users/search가 /users/{user_id}보다 먼저 매칭돼야 함
+app.include_router(friends_router)
+
+# 챌린지
+app.include_router(challenges_router)
 
 # 정책/장학금 관련
 app.include_router(scholarships_router)
